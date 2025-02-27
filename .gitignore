@@ -8,6 +8,27 @@
 *.mat
 *.rsk
 
+# Ignore GIS files
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.shp.xml
+*.geojson
+
+# Ignore image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.tif
+*.tiff
+*.bmp
+*.ico
+*.svg
+
 # Ignore system files
 .DS_Store
 
