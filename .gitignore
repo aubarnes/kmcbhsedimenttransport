@@ -35,3 +35,6 @@
 # Ignore logs and temporary files
 *.log
 *.tmp
+
+# Ignore directory "GIS"
+GIS/
