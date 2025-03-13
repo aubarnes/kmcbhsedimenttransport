@@ -31,6 +31,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
+from scipy.stats import linregress
 
 from sklearn.decomposition import PCA
 
@@ -271,4 +272,117 @@ for i in range(n_eof):
 
 plt.tight_layout()
 plt.show()
+#%% Monthly Time Series of Spatially Averaged Width
+
+## Transpose the dataframes
+oahu0045_coastsat = oahu0045_coastsat.T
+oahu0045_planetscope = oahu0045_planetscope.T
+oahu0046_coastsat = oahu0046_coastsat.T
+oahu0046_planetscope = oahu0046_planetscope.T
+
+oahu0045_combined = pd.concat([oahu0045_coastsat, oahu0045_planetscope], axis=0)
+oahu0045_combined = oahu0045_combined.sort_index()
+oahu0046_combined = pd.concat([oahu0046_coastsat, oahu0046_planetscope], axis=0)
+oahu0046_combined = oahu0046_combined.sort_index()
+
+all_combined_shoreline = oahu0045_combined.combine_first(oahu0046_combined)
+
+## Monthly average, then spatial average
+shorelines_monthly = all_combined_shoreline.resample("M").mean()
+shoreline_monthly = shorelines_monthly.mean(axis=1)
+
+shoreline_monthly_subset = shoreline_monthly.loc['2016-01-01':'2022-12-31']
+
+#%% Linear fit of shoreline_monthly from 2016-2023
+## Perform linear regression
+slope, intercept, r_value, p_value, std_err = linregress(np.arange(len(shoreline_monthly_subset)), shoreline_monthly_subset)
+#%% Plot the ave_monthly and shoreline_monthly
+fig, ax = plt.subplots(figsize=(12, 8))
+ax.plot(shoreline_monthly_subset, label="Spatially Averaged Shoreline Position")
+ax.plot(shoreline_monthly_subset.index, slope*np.arange(len(shoreline_monthly_subset)) + intercept, label="Linear Fit", linestyle="--")
+
+ax.set_title("Monthly Time Series of Spatially Averaged Width")
+ax.set_xlabel("Date")
+
+ax.xaxis.set_major_locator(mdates.YearLocator())
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+ax.grid(True, which='both', linestyle='--', color='gray')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+#%% Monthly Time Series of West vs. East side average width
+# east_west_div = 'oahu0046_0001' ## Runway
+east_west_div = 'oahu0046_0028' ## Near Bill's Rocking Point
+east_west_div_idx = np.where(all_combined_shoreline.columns == east_west_div)[0][0]
+# pyramid_all = all_combined_shoreline.loc[:, :east_west_div]
+# nb_all = all_combined_shoreline.loc[:, east_west_div:]
+
+pyramid_all = all_combined_shoreline.iloc[:, :east_west_div_idx]
+nb_all = all_combined_shoreline.iloc[:, east_west_div_idx:]
+
+pyramid_all_monthly = pyramid_all.resample("M").mean()
+nb_all_monthly = nb_all.resample("M").mean()
+
+pyramid_ave_monthly = pyramid_all_monthly.mean(axis=1)
+nb_ave_monthly = nb_all_monthly.mean(axis=1)
+
+pyramid_ave_monthly_subset = pyramid_ave_monthly.loc['2016-01-01':'2022-12-31']
+## Interpolate missing values
+pyramid_ave_monthly_subset = pyramid_ave_monthly_subset.interpolate(method='time').ffill().bfill()
+nb_ave_monthly_subset = nb_ave_monthly.loc['2016-01-01':'2022-12-31']
+
+## Perform linear regression
+slope_pyramid, intercept_pyramid, r_value_pyramid, p_value_pyramid, std_err_pyramid = linregress(np.arange(len(pyramid_ave_monthly_subset)), pyramid_ave_monthly_subset)
+slope_nb, intercept_nb, r_value_nb, p_value_nb, std_err_nb = linregress(np.arange(len(nb_ave_monthly_subset)), nb_ave_monthly_subset)
+
+#%% Plot Pyramid and NB ave_monthly with linear fits
+fig, ax = plt.subplots(figsize=(12, 8))
+ax.plot(pyramid_ave_monthly_subset, label="Pyramid Rock")
+ax.plot(nb_ave_monthly_subset, label="North Beach")
+ax.plot(pyramid_ave_monthly_subset.index, slope_pyramid*np.arange(len(pyramid_ave_monthly_subset)) + intercept_pyramid, label="Pyramid Rock Linear Fit", linestyle="--")
+ax.plot(nb_ave_monthly_subset.index, slope_nb*np.arange(len(nb_ave_monthly_subset)) + intercept_nb, label="North Beach Linear Fit", linestyle="--")
+
+ax.set_title("Monthly Time Series of West vs. East Side Average Width")
+ax.set_xlabel("Date")
+
+ax.xaxis.set_major_locator(mdates.YearLocator())
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+ax.grid(True, which='both', linestyle='--', color='gray')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+#%% Take subset of shorelines_monthly, find linear trend for each transect
+shorelines_monthly_subset = shorelines_monthly.loc['2016-01-01':'2022-12-31']
+
+## Interpolate missing values
+shorelines_monthly_subset = shorelines_monthly_subset.interpolate(method='time').ffill().bfill()
+
+## Perform linear regression for each transect
+slope_all = np.zeros(np.shape(shorelines_monthly_subset)[1])
+intercept_all = np.zeros(np.shape(shorelines_monthly_subset)[1])
+r_value_all = np.zeros(np.shape(shorelines_monthly_subset)[1])
+p_value_all = np.zeros(np.shape(shorelines_monthly_subset)[1])
+std_err_all = np.zeros(np.shape(shorelines_monthly_subset)[1])
+
+for i in range(np.shape(shorelines_monthly_subset)[1]):
+    slope_all[i], intercept_all[i], r_value_all[i], p_value_all[i], std_err_all[i] = linregress(np.arange(len(shorelines_monthly_subset)), shorelines_monthly_subset.iloc[:, i])
+
+#%% Plot the linear trends for each transect
+fig, ax = plt.subplots(figsize=(12, 8))
+ax.bar(range(len(slope_all)), slope_all*12, color=['magenta' if val < 0 else 'black' for val in slope_all])
+ax.axhline(0, color='black', linestyle='--')
+ax.axvline(23.5, color='green', linestyle='--') ## Runway Gap
+ax.axvspan(33, 40, color='lightgray', alpha=0.5) ## Rocky/Reefy Shoreline
+ax.axvspan(82, 94, color='lightgray', alpha=0.5) ## Rocky/Reefy Shoreline
+ax.text(24, ax.get_ylim()[1], 'Runway\nGap', ha='left', va='top', color='green')
+ax.text(33, ax.get_ylim()[1], 'Rocky/Reefy\nShoreline', ha='left', va='top', color='black')
+ax.set_title("Shoreline Position Trends, Jan 2016 - Dec 2022")
+ax.set_xlabel("Transect Number (West to East)")
+ax.set_ylabel("Shoreline Position\nLinear Trend (m/year)")
+
+plt.tight_layout()
+plt.show()
+
 # %%

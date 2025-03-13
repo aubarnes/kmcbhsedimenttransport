@@ -38,3 +38,8 @@
 
 # Ignore directory "GIS"
 GIS/
+
+# Ignore documents for now
+*.doc
+*.docx
+*.pdf
